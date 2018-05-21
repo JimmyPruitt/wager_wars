@@ -31,7 +31,7 @@ func main() {
 		log.Fatalln(err)
 	}
 
-	api, err := wwapi.New(wwapi.Options{
+	api, err := wwapi.BuildServer(wwapi.Options{
 		Host: "0.0.0.0",
 		Port: 8080,
 	}, db)

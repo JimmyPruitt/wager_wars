@@ -1,0 +1,18 @@
+r.dbCreate('wager_wars')
+
+r.db('rethinkdb').table('users').insert({
+    id: 'wager_wars_app',
+    password: ''
+})
+
+r.db('wager_wars').grant('wager_wars_app', {
+    read: true,
+    write: true
+})
+
+r.db('wager_wars').tableCreate('users')
+r.db('wager_wars').table('users').indexCreate('twitch_id')
+r.db('wager_wars').table('users').indexCreate('facebook_id')
+r.db('wager_wars').table('users').indexCreate('twitter_id')
+r.db('wager_wars').table('users').indexCreate('google_id')
+r.db('wager_wars').table('users').indexCreate('opponents')
