@@ -12,12 +12,12 @@ type Schema interface {
 	GetSchema() *graphql.Schema
 }
 
-type WagerWarsSchema struct {
+type wagerWarsSchema struct {
 	schema graphql.Schema
 	db     wwdb.DB
 }
 
-func (wws WagerWarsSchema) GetSchema() *graphql.Schema {
+func (wws wagerWarsSchema) GetSchema() *graphql.Schema {
 	return &wws.schema
 }
 
@@ -31,7 +31,7 @@ const (
 )
 
 func buildSchema(db wwdb.DB) (Schema, error) {
-	schema := WagerWarsSchema{
+	schema := wagerWarsSchema{
 		db: db,
 	}
 
@@ -53,15 +53,15 @@ func buildSchema(db wwdb.DB) (Schema, error) {
 	return schema, nil
 }
 
-func (wws WagerWarsSchema) getRootFields() graphql.Fields {
+func (wws wagerWarsSchema) getRootFields() graphql.Fields {
 	return graphql.Fields{
 		"user": wws.getUserRootFields(),
 	}
 }
 
-func (wws WagerWarsSchema) getUserRootFields() *graphql.Field {
+func (wws wagerWarsSchema) getUserRootFields() *graphql.Field {
 	return &graphql.Field{
-		Type: wws.getUserQueryField(),
+		Type: wws.getUserQueryField(true),
 		Args: graphql.FieldConfigArgument{
 			"id": &graphql.ArgumentConfig{
 				Description: "The unique user ID for the Wager Wars user",
@@ -83,7 +83,7 @@ func (wws WagerWarsSchema) getUserRootFields() *graphql.Field {
 	}
 }
 
-func (wws WagerWarsSchema) getSocialMediaIdField(sm SocialMedia) *graphql.Field {
+func (wws wagerWarsSchema) getSocialMediaIdField(sm SocialMedia) *graphql.Field {
 	var t string
 	switch sm {
 	case Twitter:
@@ -121,9 +121,29 @@ func (wws WagerWarsSchema) getSocialMediaIdField(sm SocialMedia) *graphql.Field 
 	}
 }
 
-func (wws WagerWarsSchema) getUserQueryField() *graphql.Object {
-	userType := graphql.NewObject(graphql.ObjectConfig{
-		Name:        "User",
+func (wws wagerWarsSchema) getUserQueryField(includeOpponents bool) *graphql.Object {
+	userType := wws.getBaseUserType("User")
+
+	if includeOpponents {
+		userType.AddFieldConfig("opponents", &graphql.Field{
+			Type:        graphql.NewList(wws.getBaseUserType("Opponent")),
+			Description: "A list of users with whom this user has agreed to join battle",
+			Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+				if user, ok := p.Source.(wwdb.User); ok {
+					return user.Opponents, nil
+				}
+
+				return nil, errors.New("Failed to resolve field \"opponents\" on type \"user\"")
+			},
+		})
+	}
+
+	return userType
+}
+
+func (wws wagerWarsSchema) getBaseUserType(name string) *graphql.Object {
+	return graphql.NewObject(graphql.ObjectConfig{
+		Name:        name,
 		Description: "A Wager Wars user and their linked social media accounts",
 		Fields: graphql.Fields{
 			"twitch_id":   wws.getSocialMediaIdField(Twitch),
@@ -132,7 +152,7 @@ func (wws WagerWarsSchema) getUserQueryField() *graphql.Object {
 			"google_id":   wws.getSocialMediaIdField(Google),
 			"id": &graphql.Field{
 				Type:        graphql.String,
-				Description: "The user's internal User ID",
+				Description: "The user's unique Wager Wars account identifier",
 				Resolve: func(p graphql.ResolveParams) (interface{}, error) {
 					if user, ok := p.Source.(wwdb.User); ok {
 						return user.Id, nil
@@ -143,18 +163,4 @@ func (wws WagerWarsSchema) getUserQueryField() *graphql.Object {
 			},
 		},
 	})
-
-	userType.AddFieldConfig("opponents", &graphql.Field{
-		Type:        graphql.NewList(userType),
-		Description: "A list of users with whom this user has agreed to join battle",
-		Resolve: func(p graphql.ResolveParams) (interface{}, error) {
-			if user, ok := p.Source.(wwdb.User); ok {
-				return user.Opponents, nil
-			}
-
-			return nil, errors.New("Failed to resolve field \"opponents\" on type \"user\"")
-		},
-	})
-
-	return userType
 }
